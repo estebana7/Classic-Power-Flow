@@ -1,6 +1,3 @@
-import time
-tinicial = time.time()
-
 #=================================================== TRABALHO 1 ===================================================
 #Trimestre: 2023.1
 #Disciplina: 210001 - Análise de Redes I
@@ -10,10 +7,12 @@ tinicial = time.time()
 #           sistema de 24-barras, cujos dados elétrinp.cos estão fornecidos em anexo no formato do programa Anarede.
 #==================================================================================================================
 
-import numpy as np
-np.set_printoptions(suppress=True)
+import time
 import matplotlib.pyplot as plt
 import pandas as pd
+import sys
+import numpy as np
+np.set_printoptions(suppress=True)
 
 #%%Dados adaptados do arquivo do editCEPEL 'IEEE 24 Barras.pwf'
 
@@ -170,8 +169,8 @@ B = np.imag(Y_barra)
 # print('\n')
 # print(np.round(np.imag(Y_barra), 4))
 
-# np.savetxt("G.csv", np.round(G, 4), delimiter=";", fmt='%.4f')
-# np.savetxt("B.csv", np.round(B, 4), delimiter=";", fmt='%.4f')
+# np.savetxt('G.csv', np.round(G, 4), delimiter=';', fmt='%.4f')
+# np.savetxt('B.csv', np.round(B, 4), delimiter=';', fmt='%.4f')
 
 #================================================== AVALIAÇÃO 1 ===================================================
 #Trimestre: 2023.1
@@ -201,13 +200,48 @@ Qesp = [] #vetor de Q demandada
 tipoBAR = [] #tipo de barra: 1: PV, 2: VTh, 3: PQ 
 
 for i in range(nb):
-    V.append(float(D_BAR[i][2])) #pega o valor da coluna 2 (V) e forma matriz
-    Th.append(float(D_BAR[i][3]) * (np.pi/180)) #pega o valor da coluna 3 (Angl) e forma matriz de ângulos
     Pg.append((D_BAR[i][4])/baseMVA) #pega o valor da coluna 4 (Pg) e forma valores de potência ativa gerada
     Qg.append((D_BAR[i][5])/baseMVA) #pega o valor da coluna 5 (Qg) e forma valores de potência reativa gerada
     Pd.append((D_BAR[i][9])/baseMVA) #pega o valor da coluna 9 (Pg) e forma valores de potência ativa demandada
     Qd.append((D_BAR[i][10])/baseMVA) #pega o valor da coluna 10 (Qg) e forma valores de potência reativa demandada
     tipoBAR.append((D_BAR[i][1])) #pega o valor da coluna 1 (Tipo) e forma o vetor de valores de tipo de barra
+
+#%% Inicialização dos Dados
+
+#Inicialização de tensões e ângulos
+
+print('''
+Escolha a opção de inicialização dos valores para o cálculo do fluxo de potência:
+[1] Dados do ANAREDE
+[2] Flat Start
+''')
+
+init = None
+while init not in (1, 2):
+    init = int(input('Digite o número da opção: '))
+
+    if init == 1:
+        for i in range(nb):
+            V.append(float(D_BAR[i][2])) #pega o valor da coluna 2 (V) e forma matriz
+            Th.append(float(D_BAR[i][3]) * (np.pi/180)) #pega o valor da coluna 3 (Angl) e forma matriz de ângulos
+
+    elif init == 2:
+        for i in range(nb):
+            if tipoBAR[i] == 1:
+                V.append(float(D_BAR[i][2])) #pega o valor da coluna 2 (V) e forma matriz
+                Th.append(0) #pega o valor da coluna 3 (Angl) e forma matriz de ângulos
+            elif tipoBAR[i] == 2:
+                V.append(float(D_BAR[i][2])) #pega o valor da coluna 2 (V) e forma matriz
+                Th.append(float(D_BAR[i][3]) * (np.pi/180)) #pega o valor da coluna 3 (Angl) e forma matriz de ângulos
+            elif tipoBAR[i] == 3:
+                V.append(1)
+                Th.append(0)
+
+    else:
+        print("Escolha novamente")
+#inicialização de potências ativas e reativas
+
+ti_ybarra = time.time()
 
 for k in range(nb):
     
@@ -235,11 +269,7 @@ size_pq = len(index_pq)
 P = np.zeros((nb, 1))
 Q = np.zeros((nb, 1))
 
-#Flat start
-V =     [1.035, 1.035, 1, 1, 1, 1, 1.025, 1, 1, 1, 1, 1,          1.02, 0.98, 1.014, 1.017, 1, 1.05, 1, 1, 1.05, 1.05, 1.05, 1]
-Th = [    0,     0, 0, 0, 0, 0,     0, 0, 0, 0, 0, 0, -13*np.pi/180,    0,     0,     0, 0,    0, 0, 0,    0,    0,    0, 0]
-
-#Cálculo de P e Q - chute inicial
+#Cálculo de P e Q a partir do chute inicial
 for i in range(nb):
 
     if tipoBAR[i] == 1:
@@ -264,6 +294,8 @@ dy = np.concatenate((dP, dQ), axis=0)
 
 tol = np.max(np.abs(dy))
 iter = 0
+
+#%% Método de Newton
 
 while tol > 0.00001:
 
@@ -403,24 +435,49 @@ for i in range(nb):
 
 V = np.array(V)
 Angl = np.array(Th)*180/np.pi
-P = P * baseMVA
-Q = Q * baseMVA
+P = np.array(P * baseMVA)
+Q = np.array(Q * baseMVA)
 
-tfinal = time.time()
-print('Tempo de Execução:', round(tfinal - tinicial, 3), 's')
-print("Convergência em:", iter, "iterações", '\n')
-# print("As tensões por barra, em p.u., são:", '\n', str(V).replace('[', '').replace(']', ''), '\n')
-# print("Os ângulos por barra, em graus, são:", '\n', str(Angl).replace('[', '').replace(']', ''), '\n')
+# print('As tensões por barra, em p.u., são:', '\n', str(V).replace('[', '').replace(']', ''), '\n')
+# print('Os ângulos por barra, em graus, são:', '\n', str(Angl).replace('[', '').replace(']', ''), '\n')
+
+#%% Fluxos de potências nas linhas
+P_km = np.zeros((nl,))
+Q_km = np.zeros((nl,))
+
+for k in range(nl):
+    f = B_de[k]
+    t = B_para[k]
+    akm = a[k]
+    gkm = G[f-1,t-1]
+    bkm = B[f-1,t-1]
+    bskm = 0
+    thkm = Th[f-1] - Th[t-1]
+    phikm = 0
+    Vk = V[f-1]
+    Vm = V[t-1]
+    Pkm = (akm * Vk)**2 * gkm - akm * Vk * Vm * gkm * np.cos(thkm + phikm) - akm * Vk * Vm * bkm * np.sin(thkm + phikm)
+    Qkm = -(akm * Vk)**2 * (bkm + bskm) + akm * Vk * Vm * bkm * np.cos(thkm + phikm) - akm * Vk * Vm * gkm * np.sin(thkm + phikm)
+    P_km[k] = Pkm
+    Q_km[k] = Qkm
+
+P_km = P_km * baseMVA
+Q_km = Q_km * baseMVA
+
+#%% Resultados
+tf_ybarra = time.time()
+print('Tempo de Execução:', round(tf_ybarra - ti_ybarra, 5), 's')
+print('Convergência em:', iter, 'iterações', '\n')
 
 #%% Criação de gráficos
 # x_pos = np.arange(nb)
 # y = V
 
-# plt.plot(x_pos, V, label='Tensão', linestyle="-", color='#5979f2')
+# plt.plot(x_pos, V, label='Tensão', linestyle='-', color='#5979f2')
 # plt.xlabel('Barras do Sistema')
 # plt.ylabel('Tensão nas barras do sistema IEEE 24 Barras (p.u.)')
 # plt.legend()
-# plt.savefig("tensao24barras.pdf")
+# plt.savefig('tensao24barras.pdf')
 # plt.show()
 
 #%% Visualização tabular
@@ -431,7 +488,7 @@ for i in range(nb):
     if tipoBAR[i] == 1:
         tipoBAR[i] = 'PV'
     elif tipoBAR[i] == 2:
-        tipoBAR[i] = 'VTh'
+        tipoBAR[i] = 'V\u03B8'
     elif tipoBAR[i] == 3:
         tipoBAR[i] = 'PQ'
     else:
@@ -452,7 +509,7 @@ print(df_b, '\n')
 
 #Relatório de Linhas
 
-df_l = pd.DataFrame(list(zip(B_de, B_para)), columns=['De barra', 'Para barra'])
+df_l = pd.DataFrame(list(zip(B_de, B_para, P_km, Q_km)), columns=['De barra', 'Para barra', 'P_km',  'Q_km'])
 
 df_l.index = np.arange(1, len(df_l) + 1) #aumenta o index em 1, para condizer com número da linha
 df_l.index.name = 'Linha' #dá nome ao index
